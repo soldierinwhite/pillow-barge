@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Pillow Barge</string>
+    <string name="rewind_10_seconds">Rewind 10 seconds</string>
+    <string name="pause">Pause</string>
+    <string name="play">Play</string>
+    <string name="forward_10_seconds">Forward 10 seconds</string>
+    <string name="stop">Stop</string>
+    <string name="add_story">Add story</string>
+    <string name="delete_story">Delete story</string>
+    <string name="delete_story_text">Are you sure you want to delete this story?</string>
+    <string name="confirm">Confirm</string>
+</resources>
