@@ -53,7 +53,6 @@ fun Home(
         mutableStateOf(false)
     }
 
-
     val stories by viewModel.stories.collectAsState(initial = listOf())
     Log.d("stories", stories.size.toString())
     Scaffold(

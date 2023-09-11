@@ -10,6 +10,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.Player.STATE_ENDED
+import androidx.media3.common.Player.STATE_IDLE
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
@@ -29,7 +31,7 @@ class HomeViewModel @Inject constructor(
     application: Application,
     private val storyDao: StoryDao
 ) : ViewModel() {
-    private val sessionToken =
+    private var sessionToken =
         application.applicationContext.let {
             SessionToken(
                 it,
@@ -85,9 +87,7 @@ class HomeViewModel @Inject constructor(
                 }
 
                 override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState in setOf(Player.STATE_ENDED, Player.STATE_IDLE)) {
-                        listeners.forEach { removeListener(it) }
-                        release()
+                    if (playbackState in setOf(STATE_ENDED, STATE_IDLE)) {
                         onEnded()
                     }
                 }
@@ -110,7 +110,6 @@ class HomeViewModel @Inject constructor(
     fun stop() {
         controller?.run {
             stop()
-            release()
         }
     }
 
@@ -128,8 +127,16 @@ class HomeViewModel @Inject constructor(
         Uri.parse(story.audioUri).path?.let { File(it).delete() }
     }
 
+    private fun release() {
+        controller?.run {
+            stop()
+            listeners.forEach { removeListener(it) }
+            release()
+        }
+    }
+
     override fun onCleared() {
-        stop()
+        release()
     }
 }
 
