@@ -10,7 +10,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface StoryDao {
     @Query("SELECT * FROM story")
-    fun getAll(): Flow<List<Story>>
+    fun getAll(): List<Story>
+
+    @Query("SELECT * FROM story")
+    fun getAllFlow(): Flow<List<Story>>
 
     @Insert
     fun insert(vararg stories: Story)

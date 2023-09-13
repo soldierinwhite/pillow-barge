@@ -51,7 +51,7 @@ class HomeViewModel @Inject constructor(
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val stories = storyDao.getAll().mapLatest { stories ->
+    val stories = storyDao.getAllFlow().mapLatest { stories ->
         stories.filter { story ->
             Uri.parse(story.audioUri).path?.let { !File(it).exists() } ?: false
         }.toTypedArray().takeIf { it.isNotEmpty() }?.let { missingStories ->
@@ -69,6 +69,7 @@ class HomeViewModel @Inject constructor(
                 }.toTypedArray())
             }
         }
+        stories
     }
 
     private val _isPlaying: MutableState<Boolean> = mutableStateOf(controller?.isPlaying == true)

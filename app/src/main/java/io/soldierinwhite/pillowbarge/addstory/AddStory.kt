@@ -4,7 +4,10 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,8 +59,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import io.soldierinwhite.pillowbarge.R
 import io.soldierinwhite.pillowbarge.addstory.AddStoryViewModel.AddStoryUIState
+import io.soldierinwhite.pillowbarge.extensions.parcelable
 import io.soldierinwhite.pillowbarge.ui.theme.PillowBargeTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
+import java.util.UUID
 
 @Composable
 fun AddStory(
@@ -164,6 +171,24 @@ fun AddStory(
                     ).show()
                 }
             }
+        val takePictureLauncher =
+            rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                scope.launch(Dispatchers.IO) {
+                    val bitmap = result.data?.extras?.parcelable<Bitmap>("data")
+                    val filePath = "${context.filesDir.absolutePath}/${UUID.randomUUID()}.png"
+                    val file = File(filePath)
+                    val fileOutputStream = File(filePath).outputStream()
+                    try {
+                        bitmap?.compress(Bitmap.CompressFormat.PNG, 90, fileOutputStream)
+                        fileOutputStream.flush()
+                        fileOutputStream.close()
+                        onImagePickerClick(Uri.fromFile(file))
+                    } catch (e: Exception) {
+                        Log.d("Image intent result", "Failed")
+                        //fail silently
+                    }
+                }
+            }
         if (bottomSheetType != AddStoryBottomSheetState.CLOSED) {
             ModalBottomSheet(onDismissRequest = {
                 bottomSheetType = AddStoryBottomSheetState.CLOSED
@@ -214,6 +239,13 @@ fun AddStory(
                                 imagePickerLauncher.launch(Intent.createChooser(Intent(Intent.ACTION_GET_CONTENT).apply {
                                     type = "image/*"
                                 }, "Pick the image thumbnail for your story"))
+                                dismissBottomSheet()
+                            }
+                            AddMediaButton(
+                                iconPainterResource = R.drawable.camera,
+                                buttonTextResource = R.string.take_a_picture
+                            ) {
+                                takePictureLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE))
                                 dismissBottomSheet()
                             }
                         }

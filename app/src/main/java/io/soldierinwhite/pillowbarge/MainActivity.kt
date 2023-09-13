@@ -28,6 +28,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PillowBargeTheme {
                 val navController = rememberNavController()
+                window.decorView.setBackgroundColor(MaterialTheme.colorScheme.background.toArgb())
                 window.statusBarColor = MaterialTheme.colorScheme.surfaceVariant.toArgb()
                 NavHost(
                     navController = navController,

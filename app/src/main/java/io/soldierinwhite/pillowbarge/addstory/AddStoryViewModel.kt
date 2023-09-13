@@ -37,9 +37,18 @@ class AddStoryViewModel @Inject constructor(
 
     fun onImageUri(uri: Uri?) {
         viewModelScope.launch {
-            inputStreamToFileUriAndName(uri)?.let { (uri, name) ->
-                savedStateHandle[IMAGE_URI_KEY] = uri.toString()
-                savedStateHandle[IMAGE_FILENAME_KEY] = name
+            when (uri?.scheme) {
+                "file" -> {
+                    savedStateHandle[IMAGE_URI_KEY] = uri.toString()
+                    savedStateHandle[IMAGE_FILENAME_KEY] = uri.lastPathSegment
+                }
+
+                "content" -> {
+                    inputStreamToFileUriAndName(uri)?.let { (fileUri, name) ->
+                        savedStateHandle[IMAGE_URI_KEY] = fileUri.toString()
+                        savedStateHandle[IMAGE_FILENAME_KEY] = name
+                    }
+                }
             }
         }
     }
