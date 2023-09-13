@@ -61,3 +61,5 @@ val dark_inversePrimary = Color(0xFF795900)
 val dark_surfaceTint = Color(0xFFFBBC00)
 val dark_outlineVariant = Color(0xFF4D4639)
 val dark_scrim = Color(0xFF000000)
+
+val transparent = Color(0X00000000)

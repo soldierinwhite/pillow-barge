@@ -13,8 +13,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
-import io.soldierinwhite.pillowbarge.home.Home
 import io.soldierinwhite.pillowbarge.addstory.AddStory
+import io.soldierinwhite.pillowbarge.addstory.AddStoryViewModel.Companion.AUDIO_FILENAME_KEY
+import io.soldierinwhite.pillowbarge.addstory.AddStoryViewModel.Companion.AUDIO_URI_KEY
+import io.soldierinwhite.pillowbarge.home.Home
+import io.soldierinwhite.pillowbarge.studio.Studio
 import io.soldierinwhite.pillowbarge.ui.theme.PillowBargeTheme
 
 @AndroidEntryPoint
@@ -26,10 +29,15 @@ class MainActivity : ComponentActivity() {
             PillowBargeTheme {
                 val navController = rememberNavController()
                 window.statusBarColor = MaterialTheme.colorScheme.surfaceVariant.toArgb()
-                NavHost(navController = navController, startDestination = "home") {
+                NavHost(
+                    navController = navController,
+                    startDestination = "home"
+                ) {
                     composable("home") {
                         Home(windowWidthSizeClass = calculateWindowSizeClass(activity = this@MainActivity).widthSizeClass) {
-                            navController.navigate("addStory")
+                            navController.navigate("addStory") {
+                                launchSingleTop = true
+                            }
                         }
                     }
                     composable(
@@ -37,8 +45,24 @@ class MainActivity : ComponentActivity() {
                         enterTransition = { slideInHorizontally(initialOffsetX = { it }) },
                         exitTransition = { slideOutHorizontally(targetOffsetX = { it }) }
                     ) {
-                        AddStory {
+                        AddStory(
+                            onSubmit = {
+                                navController.popBackStack()
+                            },
+                            onRecordStory = { navController.navigate("studio") },
+                            savedStateHandle = it.savedStateHandle
+                        )
+                    }
+                    composable("studio",
+                        enterTransition = { slideInHorizontally(initialOffsetX = { it }) },
+                        exitTransition = { slideOutHorizontally(targetOffsetX = { it }) }
+                    ) {
+                        Studio { fileName, uri ->
                             navController.popBackStack()
+                            navController.currentBackStackEntry?.run {
+                                savedStateHandle[AUDIO_URI_KEY] = uri.toString()
+                                savedStateHandle[AUDIO_FILENAME_KEY] = fileName
+                            }
                         }
                     }
                 }

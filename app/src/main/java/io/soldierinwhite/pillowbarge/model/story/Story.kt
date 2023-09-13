@@ -28,7 +28,7 @@ fun StoryCard(
     modifier: Modifier = Modifier
 ) {
     Image(
-        painter = Uri.parse(story.imageUri).path?.let {
+        painter = story.imageUri?.let { Uri.parse(it) }?.path?.let {
             try {
                 BitmapPainter(BitmapFactory.decodeFile(it).asImageBitmap())
             } catch (e: Exception) {

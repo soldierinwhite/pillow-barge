@@ -58,7 +58,8 @@ class HomeViewModel @Inject constructor(
             viewModelScope.launch(Dispatchers.IO) { storyDao.delete(*missingStories) }
         }
         stories.filter { story ->
-            Uri.parse(story.imageUri).path?.let { !File(it).exists() } ?: false
+            story.imageUri?.let { Uri.parse(it).path?.let { path -> !File(path).exists() } }
+                ?: false
         }.toTypedArray().takeIf { it.isNotEmpty() }?.let { missingImages ->
             viewModelScope.launch(Dispatchers.IO) {
                 storyDao.update(*missingImages.map {
@@ -68,7 +69,6 @@ class HomeViewModel @Inject constructor(
                 }.toTypedArray())
             }
         }
-        stories.shuffled()
     }
 
     private val _isPlaying: MutableState<Boolean> = mutableStateOf(controller?.isPlaying == true)
