@@ -1,12 +1,16 @@
 package io.soldierinwhite.pillowbarge.addstory
 
 import android.app.Application
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
+import androidx.activity.result.ActivityResult
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.soldierinwhite.pillowbarge.extensions.parcelable
 import io.soldierinwhite.pillowbarge.model.story.Story
 import io.soldierinwhite.pillowbarge.model.story.StoryDao
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +63,24 @@ class AddStoryViewModel @Inject constructor(
             inputStreamToFileUriAndName(uri)?.let { (uri, name) ->
                 savedStateHandle[AUDIO_URI_KEY] = uri.toString()
                 savedStateHandle[AUDIO_FILENAME_KEY] = name
+            }
+        }
+    }
+
+    fun onPhotoResult(activityResult: ActivityResult) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bitmap = activityResult.data?.extras?.parcelable<Bitmap>("data")
+            val filePath = "${filesDirectory.absolutePath}/${UUID.randomUUID()}.jpeg"
+            val file = File(filePath)
+            val fileOutputStream = File(filePath).outputStream()
+            try {
+                bitmap?.compress(Bitmap.CompressFormat.JPEG, 100, fileOutputStream)
+                fileOutputStream.flush()
+                fileOutputStream.close()
+                onImageUri(Uri.fromFile(file))
+            } catch (e: Exception) {
+                Log.d("Image intent result", "Failed")
+                //fail silently
             }
         }
     }

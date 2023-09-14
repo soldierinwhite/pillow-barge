@@ -61,10 +61,5 @@ class StudioViewModel @Inject constructor(
     override fun onCleared() {
         recorder?.release()
         recorder = null
-        audioFilePath.takeIf { it.isNotEmpty() }?.let { File(it) }?.run {
-            if (exists()) {
-                deleteRecursively()
-            }
-        }
     }
 }
