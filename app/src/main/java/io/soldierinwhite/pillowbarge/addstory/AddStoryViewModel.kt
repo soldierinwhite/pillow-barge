@@ -13,7 +13,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.soldierinwhite.pillowbarge.extensions.parcelable
 import io.soldierinwhite.pillowbarge.model.story.Story
 import io.soldierinwhite.pillowbarge.model.story.StoryDao
+import io.soldierinwhite.pillowbarge.model.story.StoryType
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -32,12 +34,29 @@ class AddStoryViewModel @Inject constructor(
     private val contentResolver = application.applicationContext.contentResolver
     private val filesDirectory = application.applicationContext.filesDir
 
+    private val titleState = MutableStateFlow("")
+    private val voicedByState = MutableStateFlow("")
+    private val typeState = MutableStateFlow(StoryType.Story)
+
     val addStoryUIState = combine(
+        titleState,
+        voicedByState,
+        typeState,
         savedStateHandle.getStateFlow<String?>(AUDIO_FILENAME_KEY, null),
         savedStateHandle.getStateFlow<String?>(IMAGE_FILENAME_KEY, null)
-    ) { audioFilename, imageFilename ->
-        AddStoryUIState(audioFilename, imageFilename)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AddStoryUIState(null, null))
+    ) { title, voicedBy, type, audioFilename, imageFilename ->
+        AddStoryUIState(
+            title = title,
+            voicedBy = voicedBy,
+            type = type,
+            audioFilename = audioFilename,
+            imageFilename = imageFilename
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        AddStoryUIState()
+    )
 
     fun onImageUri(uri: Uri?) {
         viewModelScope.launch {
@@ -65,6 +84,18 @@ class AddStoryViewModel @Inject constructor(
                 savedStateHandle[AUDIO_FILENAME_KEY] = name
             }
         }
+    }
+
+    fun setTitle(title: String) {
+        titleState.value = title.trim()
+    }
+
+    fun setVoicedBy(voicedBy: String) {
+        voicedByState.value = voicedBy.trim()
+    }
+
+    fun setType(type: StoryType) {
+        typeState.value = type
     }
 
     fun onPhotoResult(activityResult: ActivityResult) {
@@ -110,6 +141,9 @@ class AddStoryViewModel @Inject constructor(
             savedStateHandle.get<String?>(AUDIO_URI_KEY)?.let { audioUriString ->
                 storyDao.insert(
                     Story(
+                        title = addStoryUIState.value.title,
+                        voicedBy = addStoryUIState.value.voicedBy,
+                        type = addStoryUIState.value.type,
                         audioUri = audioUriString,
                         imageUri = savedStateHandle[IMAGE_URI_KEY]
                     )
@@ -128,8 +162,15 @@ class AddStoryViewModel @Inject constructor(
     }
 
     data class AddStoryUIState(
-        val audioFilename: String?, val imageFilename: String?
-    )
+        val title: String = "",
+        val voicedBy: String = "",
+        val type: StoryType = StoryType.Story,
+        val audioFilename: String? = null,
+        val imageFilename: String? = null
+    ) {
+        fun isValid() = title.isNotEmpty() && voicedBy.isNotEmpty() && audioFilename.isNullOrBlank()
+            .not() && imageFilename.isNullOrBlank().not()
+    }
 
     companion object {
         const val AUDIO_URI_KEY = "audioUri"

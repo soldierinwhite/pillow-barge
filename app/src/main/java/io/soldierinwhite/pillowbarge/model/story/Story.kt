@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.TypeConverter
 import io.soldierinwhite.pillowbarge.R
 import io.soldierinwhite.pillowbarge.ui.theme.PillowBargeTheme
 
@@ -153,13 +154,36 @@ fun StoryAction_Preview() {
 @Composable
 fun StoryCard_Preview() {
     PillowBargeTheme {
-        StoryCard(story = Story(0, "", ""), onDeleteClick = {}, onStoryClick = {})
+        StoryCard(
+            story = Story(0, "", "", StoryType.Story, "", ""),
+            onDeleteClick = {},
+            onStoryClick = {})
     }
 }
 
 @Entity
 data class Story(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    @ColumnInfo(name = "title", defaultValue = "") val title: String,
+    @ColumnInfo(name = "voiced_by", defaultValue = "") val voicedBy: String,
+    @ColumnInfo(name = "type", defaultValue = "0") val type: StoryType = StoryType.Story,
     @ColumnInfo(name = "image_uri") val imageUri: String?,
     @ColumnInfo(name = "audio_uri") val audioUri: String
 )
+
+class Converters {
+    @TypeConverter
+    fun typeToInt(type: StoryType) = type.value
+
+    @TypeConverter
+    fun intToType(value: Int) = StoryType.fromValue(value)
+}
+
+enum class StoryType(val value: Int) {
+    Story(0),
+    Song(1);
+
+    companion object {
+        fun fromValue(value: Int) = StoryType.values().first { it.value == value }
+    }
+}

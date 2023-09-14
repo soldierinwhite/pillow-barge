@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +35,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -46,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterHorizontally
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -58,6 +62,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import io.soldierinwhite.pillowbarge.R
 import io.soldierinwhite.pillowbarge.addstory.AddStoryViewModel.AddStoryUIState
+import io.soldierinwhite.pillowbarge.model.story.StoryType
 import io.soldierinwhite.pillowbarge.ui.theme.PillowBargeTheme
 import kotlinx.coroutines.launch
 
@@ -69,7 +74,7 @@ fun AddStory(
     onRecordStory: () -> Unit
 ) {
     viewModel.updateSaveState(savedStateHandle)
-    val uiState by viewModel.addStoryUIState.collectAsState(AddStoryUIState(null, null))
+    val uiState by viewModel.addStoryUIState.collectAsState(AddStoryUIState())
     AddStory(
         addStoryUiState = uiState,
         onAudioPickerClick = { viewModel.onAudioUri(it) },
@@ -79,6 +84,9 @@ fun AddStory(
             viewModel.addStory()
             onSubmit()
         },
+        onTitleChange = { viewModel.setTitle(it) },
+        onVoicedByChange = { viewModel.setVoicedBy(it) },
+        onTypeChange = { viewModel.setType(StoryType.values()[it]) },
         onRecordStory = onRecordStory
     )
 }
@@ -89,6 +97,9 @@ fun AddStory(
     addStoryUiState: AddStoryUIState,
     onAudioPickerClick: (Uri) -> Unit,
     onImagePickerClick: (Uri) -> Unit,
+    onTitleChange: (String) -> Unit,
+    onVoicedByChange: (String) -> Unit,
+    onTypeChange: (Int) -> Unit,
     onPhotoResult: (ActivityResult) -> Unit,
     onSubmit: () -> Unit,
     onRecordStory: () -> Unit
@@ -115,6 +126,30 @@ fun AddStory(
         ) {
             LazyColumn(contentPadding = PaddingValues(16.dp), modifier = Modifier.weight(1f)) {
                 item {
+                    AddStoryTextField(
+                        prompt = "Add a title",
+                        hint = "eg. The Three Little Pigs",
+                        value = addStoryUiState.title,
+                        onValueChange = onTitleChange
+                    )
+                    Spacer(Modifier.height(24.dp))
+                }
+                item {
+                    AddStoryTextField(
+                        prompt = "Who made this?",
+                        hint = "eg. Auntie Em",
+                        value = addStoryUiState.voicedBy,
+                        onValueChange = onVoicedByChange
+                    )
+                    Spacer(Modifier.height(24.dp))
+                }
+                item {
+                    AddStoryRadioButtons(
+                        options = StoryType.values().map { type -> type.name },
+                        selectedIndex = addStoryUiState.type.value,
+                        onSelected = { onTypeChange(it) })
+                }
+                item {
                     AddFile(
                         addStoryUiState.audioFilename,
                         stringResource(R.string.add_audio_file), R.drawable.note
@@ -138,7 +173,7 @@ fun AddStory(
             Divider(modifier = Modifier.padding(bottom = 4.dp))
             IconButton(
                 onClick = onSubmit,
-                enabled = addStoryUiState.run { audioFilename != null && imageFilename != null },
+                enabled = addStoryUiState.isValid(),
                 colors = IconButtonDefaults.iconButtonColors(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     containerColor = MaterialTheme.colorScheme.primary
@@ -327,7 +362,81 @@ fun AddFile(
 @Composable
 fun AddStory_Preview() {
     PillowBargeTheme {
-        AddStory(AddStoryUIState("NonNull", "NonNull"), {}, {}, {}, {}, {})
+        AddStory(AddStoryUIState(), {}, {}, {}, {}, {}, {}, {}, {})
+    }
+}
+
+@Composable
+@ExperimentalMaterial3Api
+fun AddStoryTextField(
+    prompt: String,
+    hint: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier.padding(8.dp)) {
+        Text(
+            prompt,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        OutlinedTextField(
+            value = value,
+            modifier = Modifier.fillMaxWidth(),
+            onValueChange = onValueChange,
+            placeholder = {
+                Text(
+                    hint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            })
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview(name = "light", showBackground = true)
+@Preview(name = "dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+fun AddStoryTextField_Preview() {
+    PillowBargeTheme {
+        AddStoryTextField(
+            prompt = "Add a title",
+            hint = "i.e. The Three Little Pigs",
+            value = "",
+            onValueChange = {})
+    }
+}
+
+@Composable
+fun AddStoryRadioButtons(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = Modifier
+            .padding(8.dp)
+            .fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        options.forEachIndexed { index, option ->
+            Column(horizontalAlignment = CenterHorizontally) {
+                RadioButton(selected = index == selectedIndex, onClick = { onSelected(index) })
+                Text(option, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+}
+
+@Preview(name = "Light", showBackground = true)
+@Preview(name = "Dark", showBackground = true)
+@Composable
+fun AddStoryRadioButtons_Preview() {
+    PillowBargeTheme {
+        AddStoryRadioButtons(options = listOf("Story", "Song"), selectedIndex = 1, onSelected = {})
     }
 }
 
