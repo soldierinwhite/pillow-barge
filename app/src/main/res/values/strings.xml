@@ -26,4 +26,5 @@
     <string name="take_a_picture">Take a picture</string>
     <string name="expand">Expand</string>
     <string name="collapse">Collapse</string>
+    <string name="add_to_queue">Add to queue</string>
 </resources>

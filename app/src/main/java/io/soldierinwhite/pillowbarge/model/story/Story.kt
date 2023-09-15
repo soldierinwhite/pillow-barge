@@ -12,7 +12,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,6 +55,7 @@ fun StoryCard(
     story: Story,
     onStoryClick: (Story) -> Unit,
     onDeleteClick: () -> Unit,
+    onEnqueue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier
@@ -102,8 +102,19 @@ fun StoryCard(
             Column(Modifier.fillMaxWidth()) {
                 StoryAction(
                     text = R.string.delete,
-                    onClick = onDeleteClick,
+                    onClick = {
+                        onDeleteClick()
+                        expanded = false
+                    },
                     icon = R.drawable.delete
+                )
+                StoryAction(
+                    text = R.string.add_to_queue,
+                    onClick = {
+                        onEnqueue()
+                        expanded = false
+                    },
+                    icon = R.drawable.queue
                 )
             }
         }
@@ -123,7 +134,6 @@ fun StoryAction(
             .requiredHeight(48.dp)
             .fillMaxWidth()
             .clickable { onClick() },
-        horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -157,6 +167,7 @@ fun StoryCard_Preview() {
         StoryCard(
             story = Story(0, "", "", StoryType.Story, "", ""),
             onDeleteClick = {},
+            onEnqueue = {},
             onStoryClick = {})
     }
 }

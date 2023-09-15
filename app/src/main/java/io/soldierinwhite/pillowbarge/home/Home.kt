@@ -152,6 +152,7 @@ fun Home(
                             }
                         },
                         onDeleteClick = { showDeleteDialogStory = it },
+                        onEnqueue = { viewModel.addToQueue(it) },
                         modifier = Modifier
                             .animateItemPlacement()
                             .padding(4.dp)

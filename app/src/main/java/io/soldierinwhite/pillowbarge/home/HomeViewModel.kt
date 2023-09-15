@@ -139,6 +139,10 @@ class HomeViewModel @Inject constructor(
     override fun onCleared() {
         release()
     }
+
+    fun addToQueue(it: Story) {
+        controller?.addMediaItem(MediaItem.fromUri(it.audioUri))
+    }
 }
 
 private const val SEEK_INCREMENT = 10000L

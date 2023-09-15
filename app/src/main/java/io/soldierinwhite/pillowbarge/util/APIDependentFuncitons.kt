@@ -1,4 +1,4 @@
-package io.soldierinwhite.pillowbarge.extensions
+package io.soldierinwhite.pillowbarge.util
 
 import android.os.Build
 import android.os.Bundle

@@ -1,14 +1,16 @@
 package io.soldierinwhite.pillowbarge.addstory
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.content.res.Configuration
 import android.net.Uri
+import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.ActivityResult
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -58,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
 import io.soldierinwhite.pillowbarge.R
@@ -65,6 +68,8 @@ import io.soldierinwhite.pillowbarge.addstory.AddStoryViewModel.AddStoryUIState
 import io.soldierinwhite.pillowbarge.model.story.StoryType
 import io.soldierinwhite.pillowbarge.ui.theme.PillowBargeTheme
 import kotlinx.coroutines.launch
+import java.io.File
+import java.util.UUID
 
 @Composable
 fun AddStory(
@@ -79,11 +84,12 @@ fun AddStory(
         addStoryUiState = uiState,
         onAudioPickerClick = { viewModel.onAudioUri(it) },
         onImagePickerClick = { viewModel.onImageUri(it) },
-        onPhotoResult = { viewModel.onPhotoResult(it) },
+        onPhotoResult = { viewModel.onPhotoResult() },
         onSubmit = {
             viewModel.addStory()
             onSubmit()
         },
+        onImageFileCreated = { viewModel.setImageFile(it) },
         onTitleChange = { viewModel.setTitle(it) },
         onVoicedByChange = { viewModel.setVoicedBy(it) },
         onTypeChange = { viewModel.setType(StoryType.values()[it]) },
@@ -100,7 +106,8 @@ fun AddStory(
     onTitleChange: (String) -> Unit,
     onVoicedByChange: (String) -> Unit,
     onTypeChange: (Int) -> Unit,
-    onPhotoResult: (ActivityResult) -> Unit,
+    onPhotoResult: () -> Unit,
+    onImageFileCreated: (File) -> Unit,
     onSubmit: () -> Unit,
     onRecordStory: () -> Unit
 ) {
@@ -108,7 +115,8 @@ fun AddStory(
         topBar = {
             TopAppBar(title = { Text(text = "Add a new story") })
         }
-    ) {
+    ) { paddingValues ->
+        val context = LocalContext.current
         val audioPickerLauncher =
             rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 result.data?.data?.let { uri -> onAudioPickerClick(uri) }
@@ -117,12 +125,22 @@ fun AddStory(
             rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
                 result.data?.data?.let { uri -> onImagePickerClick(uri) }
             }
+        val takePictureLauncher =
+            rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+                onPhotoResult()
+            }
+        val cameraPermissionLauncher =
+            rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+                if (isGranted) {
+                    takePicture(takePictureLauncher, context) { onImageFileCreated(it) }
+                }
+            }
         var bottomSheetType by remember { mutableStateOf(AddStoryBottomSheetState.CLOSED) }
         val bottomSheetState = rememberModalBottomSheetState()
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(it), horizontalAlignment = Alignment.End
+                .padding(paddingValues), horizontalAlignment = Alignment.End
         ) {
             LazyColumn(contentPadding = PaddingValues(16.dp), modifier = Modifier.weight(1f)) {
                 item {
@@ -190,7 +208,6 @@ fun AddStory(
             }
         }
 
-        val context = LocalContext.current
         val recordPermissionLauncher =
             rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
                 if (isGranted) {
@@ -202,10 +219,6 @@ fun AddStory(
                         Toast.LENGTH_SHORT
                     ).show()
                 }
-            }
-        val takePictureLauncher =
-            rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-                onPhotoResult(result)
             }
         if (bottomSheetType != AddStoryBottomSheetState.CLOSED) {
             ModalBottomSheet(onDismissRequest = {
@@ -263,7 +276,19 @@ fun AddStory(
                                 iconPainterResource = R.drawable.camera,
                                 buttonTextResource = R.string.take_a_picture
                             ) {
-                                takePictureLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE))
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.CAMERA
+                                    ) == PERMISSION_GRANTED
+                                ) {
+                                    takePicture(takePictureLauncher, context) {
+                                        onImageFileCreated(
+                                            it
+                                        )
+                                    }
+                                } else {
+                                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
                                 dismissBottomSheet()
                             }
                         }
@@ -362,7 +387,7 @@ fun AddFile(
 @Composable
 fun AddStory_Preview() {
     PillowBargeTheme {
-        AddStory(AddStoryUIState(), {}, {}, {}, {}, {}, {}, {}, {})
+        AddStory(AddStoryUIState(), {}, {}, {}, {}, {}, {}, {}, {}, {})
     }
 }
 
@@ -438,6 +463,30 @@ fun AddStoryRadioButtons_Preview() {
     PillowBargeTheme {
         AddStoryRadioButtons(options = listOf("Story", "Song"), selectedIndex = 1, onSelected = {})
     }
+}
+
+fun takePicture(
+    takePictureLauncher: ActivityResultLauncher<Intent>,
+    context: Context,
+    onFileCreated: (File) -> Unit
+) {
+    val file = File(
+        context.getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+        "${UUID.randomUUID()}.jpg"
+    ).also {
+        onFileCreated(it)
+    }
+    takePictureLauncher.launch(Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+        putExtra(
+            MediaStore.EXTRA_OUTPUT,
+            FileProvider.getUriForFile(
+                context,
+                "${context.applicationContext.packageName}.provider",
+                file
+            )
+        )
+        flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+    })
 }
 
 enum class AddStoryBottomSheetState {

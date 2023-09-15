@@ -2,15 +2,15 @@ package io.soldierinwhite.pillowbarge.addstory
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
 import android.util.Log
-import androidx.activity.result.ActivityResult
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.soldierinwhite.pillowbarge.extensions.parcelable
 import io.soldierinwhite.pillowbarge.model.story.Story
 import io.soldierinwhite.pillowbarge.model.story.StoryDao
 import io.soldierinwhite.pillowbarge.model.story.StoryType
@@ -37,6 +37,8 @@ class AddStoryViewModel @Inject constructor(
     private val titleState = MutableStateFlow("")
     private val voicedByState = MutableStateFlow("")
     private val typeState = MutableStateFlow(StoryType.Story)
+
+    private lateinit var imageFile: File
 
     val addStoryUIState = combine(
         titleState,
@@ -98,22 +100,42 @@ class AddStoryViewModel @Inject constructor(
         typeState.value = type
     }
 
-    fun onPhotoResult(activityResult: ActivityResult) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val bitmap = activityResult.data?.extras?.parcelable<Bitmap>("data")
-            val filePath = "${filesDirectory.absolutePath}/${UUID.randomUUID()}.jpeg"
-            val file = File(filePath)
-            val fileOutputStream = File(filePath).outputStream()
-            try {
-                bitmap?.compress(Bitmap.CompressFormat.JPEG, 100, fileOutputStream)
-                fileOutputStream.flush()
-                fileOutputStream.close()
-                onImageUri(Uri.fromFile(file))
-            } catch (e: Exception) {
-                Log.d("Image intent result", "Failed")
-                //fail silently
+    fun onPhotoResult() {
+        Uri.fromFile(imageFile).let {
+            if (it.toString().isNotBlank()) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        ImageDecoder.decodeBitmap(
+                            ImageDecoder.createSource(
+                                contentResolver,
+                                it
+                            )
+                        ) { decoder, _, _ ->
+                            decoder.setTargetSampleSize(1)
+                            decoder.isMutableRequired = true
+                        }
+                    } else {
+                        MediaStore.Images.Media.getBitmap(contentResolver, it)
+                    }
+                    val filePath = "${filesDirectory.absolutePath}/${UUID.randomUUID()}.jpeg"
+                    val file = File(filePath)
+                    val fileOutputStream = File(filePath).outputStream()
+                    try {
+                        bitmap?.compress(Bitmap.CompressFormat.JPEG, 60, fileOutputStream)
+                        fileOutputStream.flush()
+                        fileOutputStream.close()
+                        onImageUri(Uri.fromFile(file))
+                    } catch (e: Exception) {
+                        Log.d("Image intent result", "Failed")
+                        //fail silently
+                    }
+                }
             }
         }
+    }
+
+    fun setImageFile(file: File) {
+        imageFile = file
     }
 
     private fun inputStreamToFileUriAndName(uri: Uri?): Pair<Uri, String>? {

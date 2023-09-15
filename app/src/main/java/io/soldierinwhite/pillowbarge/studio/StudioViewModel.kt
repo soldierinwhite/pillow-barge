@@ -31,6 +31,8 @@ class StudioViewModel @Inject constructor(
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            setAudioEncodingBitRate(16 * 44100)
+            setAudioSamplingRate(44100)
             setOutputFile(audioFilePath)
             setMaxFileSize(50 * 1000 * 1000)
             prepare()
