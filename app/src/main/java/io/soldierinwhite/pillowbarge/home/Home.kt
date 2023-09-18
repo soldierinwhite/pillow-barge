@@ -1,6 +1,5 @@
 package io.soldierinwhite.pillowbarge.home
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.slideInVertically
@@ -41,20 +40,56 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import io.soldierinwhite.pillowbarge.R
 import io.soldierinwhite.pillowbarge.model.story.Story
 import io.soldierinwhite.pillowbarge.model.story.StoryCard
+import io.soldierinwhite.pillowbarge.model.story.StoryType
 import io.soldierinwhite.pillowbarge.player.PlaybackButton
+import io.soldierinwhite.pillowbarge.ui.theme.PillowBargeTheme
+import io.soldierinwhite.pillowbarge.util.fromWidth
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun Home(
     viewModel: HomeViewModel = hiltViewModel(),
-    windowWidthSizeClass: WindowWidthSizeClass,
     onFabClick: () -> Unit
+) {
+    val windowWidthSizeClass = LocalConfiguration.current.screenWidthDp.dp.fromWidth()
+    Home(
+        stories = viewModel.stories.collectAsState(initial = listOf()).value,
+        isPlaying = viewModel.isPlaying.value,
+        windowWidthSizeClass = windowWidthSizeClass,
+        onPause = { viewModel.pause() },
+        onPlay = { viewModel.play() },
+        onSeekBack = { viewModel.seekBack() },
+        onSeekForward = { viewModel.seekForward() },
+        onStop = { viewModel.stop() },
+        onFabClick = onFabClick,
+        onStartItem = { audioUri, onEnded -> viewModel.startAudio(audioUri, onEnded) },
+        onQueueItem = { viewModel.addToQueue(it) },
+        onDelete = { viewModel.delete(it) }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun Home(
+    stories: List<Story>,
+    isPlaying: Boolean,
+    windowWidthSizeClass: WindowWidthSizeClass,
+    onPause: () -> Unit,
+    onPlay: () -> Unit,
+    onSeekBack: () -> Unit,
+    onSeekForward: () -> Unit,
+    onStop: () -> Unit,
+    onFabClick: () -> Unit,
+    onStartItem: (String, () -> Unit) -> Unit,
+    onQueueItem: (String) -> Unit,
+    onDelete: (Story) -> Unit
 ) {
     var showPlayerUI by rememberSaveable {
         mutableStateOf(false)
@@ -62,8 +97,6 @@ fun Home(
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
 
-    val stories by viewModel.stories.collectAsState(initial = listOf())
-    Log.d("stories", stories.size.toString())
     Scaffold(
         modifier = Modifier
             .animateContentSize()
@@ -80,7 +113,6 @@ fun Home(
                 enter = slideInVertically(initialOffsetY = { it }),
                 exit = slideOutVertically(targetOffsetY = { it })
             ) {
-                val playing by viewModel.isPlaying
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -88,27 +120,27 @@ fun Home(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     PlaybackButton(
-                        onClick = { viewModel.seekBack() },
+                        onClick = onSeekBack,
                         icon = R.drawable.replay_10,
                         modifier = Modifier.weight(1f),
                         contentDescription = stringResource(R.string.rewind_10_seconds)
                     )
                     PlaybackButton(
-                        onClick = { if (playing) viewModel.pause() else viewModel.play() },
-                        icon = if (playing) R.drawable.pause else R.drawable.play,
+                        onClick = { if (isPlaying) onPause() else onPlay() },
+                        icon = if (isPlaying) R.drawable.pause else R.drawable.play,
                         modifier = Modifier.weight(1f),
-                        contentDescription = if (playing) stringResource(R.string.pause) else stringResource(
+                        contentDescription = if (isPlaying) stringResource(R.string.pause) else stringResource(
                             R.string.play
                         )
                     )
                     PlaybackButton(
-                        onClick = { viewModel.seekForward() },
+                        onClick = onSeekForward,
                         icon = R.drawable.forward_10,
                         modifier = Modifier.weight(1f),
                         contentDescription = stringResource(R.string.forward_10_seconds)
                     )
                     PlaybackButton(
-                        onClick = { viewModel.stop() },
+                        onClick = onStop,
                         icon = R.drawable.stop,
                         modifier = Modifier.weight(1f),
                         contentDescription = stringResource(R.string.stop)
@@ -147,12 +179,12 @@ fun Home(
                         story = it,
                         onStoryClick = { story ->
                             showPlayerUI = true
-                            viewModel.startAudio(story.audioUri) {
+                            onStartItem(story.audioUri) {
                                 showPlayerUI = false
                             }
                         },
                         onDeleteClick = { showDeleteDialogStory = it },
-                        onEnqueue = { viewModel.addToQueue(it) },
+                        onEnqueue = { onQueueItem(it.audioUri) },
                         modifier = Modifier
                             .animateItemPlacement()
                             .padding(4.dp)
@@ -170,7 +202,7 @@ fun Home(
                     text = { Text(stringResource(R.string.delete_story_text)) },
                     confirmButton = {
                         IconButton(onClick = {
-                            showDeleteDialogStory?.let { viewModel.delete(it) }
+                            showDeleteDialogStory?.let { onDelete(it) }
                             showDeleteDialogStory = null
                         }) {
                             Icon(
@@ -182,5 +214,51 @@ fun Home(
                     onDismissRequest = { showDeleteDialogStory = null })
             }
         }
+    }
+}
+
+@Preview
+@Composable
+fun Home_Preview() {
+    PillowBargeTheme {
+        Home(
+            stories = listOf(
+                Story(
+                    id = 7606,
+                    title = "inciderint",
+                    voicedBy = "justo",
+                    type = StoryType.Story,
+                    imageUri = null,
+                    audioUri = "a"
+                ),
+                Story(
+                    id = 7607,
+                    title = "inciderint",
+                    voicedBy = "justo",
+                    type = StoryType.Story,
+                    imageUri = null,
+                    audioUri = "a"
+                ),
+                Story(
+                    id = 7608,
+                    title = "inciderint",
+                    voicedBy = "justo",
+                    type = StoryType.Story,
+                    imageUri = null,
+                    audioUri = "a"
+                )
+            ),
+            isPlaying = true,
+            windowWidthSizeClass = WindowWidthSizeClass.Compact,
+            onPause = { },
+            onPlay = { },
+            onSeekBack = { },
+            onSeekForward = { },
+            onStop = { },
+            onFabClick = { },
+            onStartItem = { _, _ -> },
+            onQueueItem = {},
+            onDelete = {}
+        )
     }
 }

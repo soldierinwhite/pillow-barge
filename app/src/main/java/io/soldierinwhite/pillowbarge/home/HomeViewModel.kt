@@ -140,8 +140,8 @@ class HomeViewModel @Inject constructor(
         release()
     }
 
-    fun addToQueue(it: Story) {
-        controller?.addMediaItem(MediaItem.fromUri(it.audioUri))
+    fun addToQueue(audioUriString: String) {
+        controller?.addMediaItem(MediaItem.fromUri(audioUriString))
     }
 }
 
