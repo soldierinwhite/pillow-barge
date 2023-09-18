@@ -89,11 +89,11 @@ class AddStoryViewModel @Inject constructor(
     }
 
     fun setTitle(title: String) {
-        titleState.value = title.trim()
+        titleState.value = title
     }
 
     fun setVoicedBy(voicedBy: String) {
-        voicedByState.value = voicedBy.trim()
+        voicedByState.value = voicedBy
     }
 
     fun setType(type: StoryType) {
@@ -163,8 +163,8 @@ class AddStoryViewModel @Inject constructor(
             savedStateHandle.get<String?>(AUDIO_URI_KEY)?.let { audioUriString ->
                 storyDao.insert(
                     Story(
-                        title = addStoryUIState.value.title,
-                        voicedBy = addStoryUIState.value.voicedBy,
+                        title = addStoryUIState.value.title.trim(),
+                        voicedBy = addStoryUIState.value.voicedBy.trim(),
                         type = addStoryUIState.value.type,
                         audioUri = audioUriString,
                         imageUri = savedStateHandle[IMAGE_URI_KEY]
