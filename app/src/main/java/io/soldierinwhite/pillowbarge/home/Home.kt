@@ -32,11 +32,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -45,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.soldierinwhite.pillowbarge.R
 import io.soldierinwhite.pillowbarge.model.story.Story
 import io.soldierinwhite.pillowbarge.model.story.StoryCard
@@ -59,9 +58,10 @@ fun Home(
     onFabClick: () -> Unit
 ) {
     val windowWidthSizeClass = LocalConfiguration.current.screenWidthDp.dp.fromWidth()
+    val uiState by viewModel.homeUiState.collectAsStateWithLifecycle()
     Home(
-        stories = viewModel.stories.collectAsState(initial = listOf()).value,
-        isPlaying = viewModel.isPlaying.value,
+        stories = uiState.stories,
+        playbackState = uiState.playbackState,
         windowWidthSizeClass = windowWidthSizeClass,
         onPause = { viewModel.pause() },
         onPlay = { viewModel.play() },
@@ -69,7 +69,7 @@ fun Home(
         onSeekForward = { viewModel.seekForward() },
         onStop = { viewModel.stop() },
         onFabClick = onFabClick,
-        onStartItem = { audioUri, onEnded -> viewModel.startAudio(audioUri, onEnded) },
+        onStartItem = { audioUri -> viewModel.startAudio(audioUri) },
         onQueueItem = { viewModel.addToQueue(it) },
         onDelete = { viewModel.delete(it) }
     )
@@ -79,7 +79,7 @@ fun Home(
 @Composable
 fun Home(
     stories: List<Story>,
-    isPlaying: Boolean,
+    playbackState: PlaybackState,
     windowWidthSizeClass: WindowWidthSizeClass,
     onPause: () -> Unit,
     onPlay: () -> Unit,
@@ -87,16 +87,14 @@ fun Home(
     onSeekForward: () -> Unit,
     onStop: () -> Unit,
     onFabClick: () -> Unit,
-    onStartItem: (String, () -> Unit) -> Unit,
+    onStartItem: (String) -> Unit,
     onQueueItem: (String) -> Unit,
     onDelete: (Story) -> Unit
 ) {
-    var showPlayerUI by rememberSaveable {
-        mutableStateOf(false)
-    }
+    val showPlayerUI = playbackState != PlaybackState.STOPPED
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
-
+    val isPlaying = playbackState == PlaybackState.PLAYING
     Scaffold(
         modifier = Modifier
             .animateContentSize()
@@ -178,10 +176,7 @@ fun Home(
                     StoryCard(
                         story = it,
                         onStoryClick = { story ->
-                            showPlayerUI = true
-                            onStartItem(story.audioUri) {
-                                showPlayerUI = false
-                            }
+                            onStartItem(story.audioUri)
                         },
                         onDeleteClick = { showDeleteDialogStory = it },
                         onEnqueue = { onQueueItem(it.audioUri) },
@@ -248,7 +243,7 @@ fun Home_Preview() {
                     audioUri = "a"
                 )
             ),
-            isPlaying = true,
+            playbackState = PlaybackState.PLAYING,
             windowWidthSizeClass = WindowWidthSizeClass.Compact,
             onPause = { },
             onPlay = { },
@@ -256,7 +251,7 @@ fun Home_Preview() {
             onSeekForward = { },
             onStop = { },
             onFabClick = { },
-            onStartItem = { _, _ -> },
+            onStartItem = { },
             onQueueItem = {},
             onDelete = {}
         )

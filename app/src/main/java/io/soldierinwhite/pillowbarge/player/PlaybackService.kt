@@ -1,5 +1,6 @@
 package io.soldierinwhite.pillowbarge.player
 
+import androidx.media3.common.AudioAttributes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -14,7 +15,8 @@ class PlaybackService : MediaSessionService() {
     // Create your player and media session in the onCreate lifecycle event
     override fun onCreate() {
         super.onCreate()
-        val player = ExoPlayer.Builder(this).build()
+        val player =
+            ExoPlayer.Builder(this).setAudioAttributes(AudioAttributes.DEFAULT, true).build()
         mediaSession = MediaSession.Builder(this, player).build()
     }
 

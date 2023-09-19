@@ -3,9 +3,6 @@ package io.soldierinwhite.pillowbarge.home
 import android.app.Application
 import android.content.ComponentName
 import android.net.Uri
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -21,79 +18,81 @@ import io.soldierinwhite.pillowbarge.model.story.StoryDao
 import io.soldierinwhite.pillowbarge.player.PlaybackService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    application: Application,
-    private val storyDao: StoryDao
+    private val storyDao: StoryDao,
+    private val application: Application
 ) : ViewModel() {
-    private var sessionToken =
-        application.applicationContext.let {
-            SessionToken(
-                it,
-                ComponentName(it, PlaybackService::class.java)
-            )
-        }
-
-    private val controllerFuture =
-        MediaController.Builder(application.applicationContext, sessionToken).buildAsync()
 
     private var controller: MediaController? = null
-
-    init {
-        controllerFuture.addListener({
-            controller = controllerFuture.get()
-        }, MoreExecutors.directExecutor())
-    }
+    private val currentMediaItem = MutableStateFlow<MediaItem?>(null)
+    private val playbackState = MutableStateFlow(PlaybackState.STOPPED)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val stories = storyDao.getAllFlow().mapLatest { stories ->
-        stories.filter { story ->
-            Uri.parse(story.audioUri).path?.let { !File(it).exists() } ?: false
-        }.toTypedArray().takeIf { it.isNotEmpty() }?.let { missingStories ->
-            viewModelScope.launch(Dispatchers.IO) { storyDao.delete(*missingStories) }
-        }
-        stories.filter { story ->
-            story.imageUri?.let { Uri.parse(it).path?.let { path -> !File(path).exists() } }
-                ?: false
-        }.toTypedArray().takeIf { it.isNotEmpty() }?.let { missingImages ->
-            viewModelScope.launch(Dispatchers.IO) {
-                storyDao.update(*missingImages.map {
-                    it.copy(
-                        imageUri = null
-                    )
-                }.toTypedArray())
-            }
-        }
-        stories
-    }
+    val homeUiState = combine(
+        currentMediaItem.mapLatest { it }.distinctUntilChanged()
+            .flatMapLatest { mediaItem ->
+                if (mediaItem != null) {
+                    val sessionToken =
+                        SessionToken(
+                            application.applicationContext,
+                            ComponentName(
+                                application.applicationContext,
+                                PlaybackService::class.java
+                            )
+                        )
+                    val controllerFuture =
+                        MediaController.Builder(application.applicationContext, sessionToken)
+                            .buildAsync()
+                    controllerFuture.addListener({
+                        controller = controllerFuture.get().also {
+                            it.setMediaItem(mediaItem)
+                            it.prepare()
+                            it.play()
+                            it.addListener(object : Player.Listener {
+                                override fun onIsPlayingChanged(playing: Boolean) {
+                                    playbackState.value =
+                                        if (playing) PlaybackState.PLAYING else PlaybackState.PAUSED
+                                }
 
-    private val _isPlaying: MutableState<Boolean> = mutableStateOf(controller?.isPlaying == true)
-    val isPlaying: State<Boolean> get() = _isPlaying
+                                override fun onPlaybackStateChanged(ps: Int) {
+                                    if (ps in setOf(STATE_ENDED, STATE_IDLE)) {
+                                        playbackState.value = PlaybackState.STOPPED
+                                        currentMediaItem.value = null
+                                        MediaController.releaseFuture(controllerFuture)
+                                    }
+                                }
+                            }.also { listener -> listeners.add(listener) })
+                        }
+                    }, MoreExecutors.directExecutor())
+                } else {
+                    playbackState.value = PlaybackState.STOPPED
+                }
+                playbackState
+            }, storyDao.getAllFlow()
+    ) { p, stories ->
+        HomeUiState(p, stories)
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        HomeUiState(PlaybackState.STOPPED, listOf())
+    )
 
     private val listeners = mutableListOf<Player.Listener>()
 
-    fun startAudio(audioUriString: String, onEnded: () -> Unit) {
-        controller?.run {
-            setMediaItem(MediaItem.fromUri(audioUriString))
-            prepare()
-            play()
-            addListener(object : Player.Listener {
-                override fun onIsPlayingChanged(playing: Boolean) {
-                    _isPlaying.value = playing
-                }
-
-                override fun onPlaybackStateChanged(playbackState: Int) {
-                    if (playbackState in setOf(STATE_ENDED, STATE_IDLE)) {
-                        onEnded()
-                    }
-                }
-            }.also { listeners.add(it) })
-        }
+    fun startAudio(audioUriString: String) {
+        currentMediaItem.value = MediaItem.fromUri(audioUriString)
     }
 
     fun seekBack() {
@@ -143,6 +142,17 @@ class HomeViewModel @Inject constructor(
     fun addToQueue(audioUriString: String) {
         controller?.addMediaItem(MediaItem.fromUri(audioUriString))
     }
+}
+
+data class HomeUiState(
+    val playbackState: PlaybackState,
+    val stories: List<Story>
+)
+
+enum class PlaybackState {
+    PLAYING,
+    PAUSED,
+    STOPPED
 }
 
 private const val SEEK_INCREMENT = 10000L

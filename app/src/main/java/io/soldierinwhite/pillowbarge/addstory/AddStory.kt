@@ -44,7 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +62,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.soldierinwhite.pillowbarge.R
 import io.soldierinwhite.pillowbarge.addstory.AddStoryViewModel.AddStoryUIState
 import io.soldierinwhite.pillowbarge.model.story.StoryType
@@ -79,7 +79,7 @@ fun AddStory(
     onRecordStory: () -> Unit
 ) {
     viewModel.updateSaveState(savedStateHandle)
-    val uiState by viewModel.addStoryUIState.collectAsState(AddStoryUIState())
+    val uiState by viewModel.addStoryUIState.collectAsStateWithLifecycle(AddStoryUIState())
     AddStory(
         addStoryUiState = uiState,
         onAudioPickerClick = { viewModel.onAudioUri(it) },
