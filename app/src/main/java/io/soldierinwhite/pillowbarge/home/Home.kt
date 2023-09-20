@@ -91,7 +91,7 @@ fun Home(
     onQueueItem: (String) -> Unit,
     onDelete: (Story) -> Unit
 ) {
-    val showPlayerUI = playbackState != PlaybackState.STOPPED
+    val showPlayerUI = playbackState != PlaybackState.UNINITIALISED
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val isPlaying = playbackState == PlaybackState.PLAYING
