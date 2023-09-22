@@ -27,4 +27,6 @@
     <string name="expand">Expand</string>
     <string name="collapse">Collapse</string>
     <string name="add_to_queue">Add to queue</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
 </resources>

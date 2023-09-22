@@ -15,6 +15,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
@@ -31,12 +32,14 @@ class PlaybackController @Inject constructor(
     private var controller: MediaController? = null
     private val _currentMediaItem = MutableStateFlow<MediaItem?>(null)
     private val currentMediaItem: Flow<MediaItem?> get() = _currentMediaItem
+    private val uriList = MutableStateFlow<List<MediaItem>>(listOf())
     private val listeners = mutableListOf<Player.Listener>()
 
     private var releaseMediaService: () -> Unit = {}
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val playbackState =
+    val playbackDetails = combine(
+        uriList,
         currentMediaItem.distinctUntilChanged().transformLatest { mediaItem ->
             if (mediaItem != null) {
                 val sessionToken =
@@ -54,25 +57,36 @@ class PlaybackController @Inject constructor(
                 controllerFuture.addListener({
                     controller = controllerFuture.get().also {
                         it.setMediaItem(mediaItem)
+                        uriList.value = listOf(mediaItem)
                         it.prepare()
                         it.play()
                         it.addListener(object : Player.Listener {
                             override fun onIsPlayingChanged(playing: Boolean) {
-                                scope.launch { emit(if (playing) PlaybackState.PLAYING else PlaybackState.PAUSED) }
+                                scope.launch { emit(mediaItem to if (playing) PlaybackState.PLAYING else PlaybackState.PAUSED) }
                             }
 
                             override fun onPlaybackStateChanged(ps: Int) {
                                 if (ps in setOf(Player.STATE_ENDED, Player.STATE_IDLE)) {
-                                    scope.launch { emit(PlaybackState.STOPPED) }
+                                    scope.launch { emit(mediaItem to PlaybackState.STOPPED) }
                                 }
                             }
                         }.also { listener -> listeners.add(listener) })
                     }
                 }, MoreExecutors.directExecutor())
             } else {
-                scope.launch { emit(PlaybackState.UNINITIALISED) }
+                scope.launch { emit(null to PlaybackState.UNINITIALISED) }
             }
-        }.stateIn(scope, SharingStarted.WhileSubscribed(5000), PlaybackState.UNINITIALISED)
+        }) { uris, (currentUri, state) ->
+        PlaybackDetails(
+            currentlyPlayingMediaItem = currentUri,
+            mediaItems = uris,
+            playbackState = state
+        )
+    }.distinctUntilChanged().stateIn(
+        scope,
+        SharingStarted.WhileSubscribed(5000),
+        PlaybackDetails(null, listOf(), PlaybackState.UNINITIALISED)
+    )
 
     fun sendPlayerEvent(playerEvent: PlayerEvent) {
         when (playerEvent) {
@@ -107,10 +121,25 @@ class PlaybackController @Inject constructor(
             }
 
             is PlayerEvent.Queue -> {
+                uriList.value = uriList.value + listOf(playerEvent.mediaItem)
                 controller?.addMediaItem(playerEvent.mediaItem)
+            }
+
+            PlayerEvent.Next -> {
+                controller?.seekToNextMediaItem()
+            }
+
+            PlayerEvent.Previous -> {
+                controller?.seekToPreviousMediaItem()
             }
         }
     }
+
+    data class PlaybackDetails(
+        val currentlyPlayingMediaItem: MediaItem?,
+        val mediaItems: List<MediaItem>,
+        val playbackState: PlaybackState
+    )
 
     sealed class PlayerEvent {
         data class Start(val mediaItem: MediaItem) : PlayerEvent()
@@ -120,6 +149,9 @@ class PlaybackController @Inject constructor(
         data class SeekBackward(val duration: Duration) : PlayerEvent()
         object Release : PlayerEvent()
         data class Queue(val mediaItem: MediaItem) : PlayerEvent()
+
+        object Next : PlayerEvent()
+        object Previous : PlayerEvent()
     }
 
 }

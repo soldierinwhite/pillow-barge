@@ -23,13 +23,17 @@ class HomeViewModel @Inject constructor(
     private val playbackController: PlaybackController
 ) : ViewModel() {
     val homeUiState = combine(
-        playbackController.playbackState, storyDao.getAllFlow()
-    ) { playbackState, stories ->
-        HomeUiState(playbackState, stories)
+        playbackController.playbackDetails, storyDao.getAllFlow()
+    ) { playbackDetails, stories ->
+        HomeUiState(
+            playbackDetails.playbackState,
+            stories,
+            stories.find { it.audioUri == playbackDetails.currentlyPlayingMediaItem?.localConfiguration?.uri?.toString() },
+            playbackDetails.mediaItems.mapNotNull { mediaItem -> stories.find { it.audioUri == mediaItem.localConfiguration?.uri?.toString() } })
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        HomeUiState(PlaybackState.UNINITIALISED, listOf())
+        HomeUiState(PlaybackState.UNINITIALISED, listOf(), null, listOf())
     )
 
     fun startAudio(audioUriString: String) {
@@ -68,6 +72,14 @@ class HomeViewModel @Inject constructor(
         playbackController.sendPlayerEvent(PlaybackController.PlayerEvent.Release)
     }
 
+    fun next() {
+        playbackController.sendPlayerEvent(PlaybackController.PlayerEvent.Next)
+    }
+
+    fun previous() {
+        playbackController.sendPlayerEvent(PlaybackController.PlayerEvent.Previous)
+    }
+
     override fun onCleared() {
         stop()
     }
@@ -89,7 +101,9 @@ class HomeViewModel @Inject constructor(
 
 data class HomeUiState(
     val playbackState: PlaybackState,
-    val stories: List<Story>
+    val stories: List<Story>,
+    val currentlyPlaylingStory: Story?,
+    val playlist: List<Story>
 )
 
 enum class PlaybackState {
